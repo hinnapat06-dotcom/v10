@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Premium pristine Blue & White theme */
+  --color-slate-50: #F8FAFC;          /* Clean ice-blue slate white */
+  --color-slate-100: #F1F5F9;         /* Cool light gray */
+  --color-slate-200: #E2E8F0;         /* Light gray border */
+  --color-slate-300: #CBD5E1;         /* Medium light gray */
+  --color-slate-400: #94A3B8;         /* Cool muted slate text */
+  --color-slate-500: #64748B;         /* Slate text secondary */
+  --color-slate-600: #475569;         /* Active slate gray */
+  --color-slate-700: #334155;         /* Deep slate */
+  --color-slate-800: #1E293B;         /* Charcoal text */
+  --color-slate-900: #0F172A;         /* Dark navy slate heading */
+
+  --color-blue-50: #EFF6FF;           /* Very light clean medical blue background */
+  --color-blue-100: #DBEAFE;          /* Soft light blue highlight */
+  --color-blue-200: #BFDBFE;          /* Selected item borders */
+  --color-blue-300: #93C5FD;          
+  --color-blue-400: #60A5FA;          
+  --color-blue-500: #3B82F6;          /* Brand bright blue */
+  --color-blue-600: #2563EB;          /* Primary medical blue buttons */
+  --color-blue-700: #1D4ED8;          /* Primary button hover state */
+  --color-blue-800: #1E40AF;          
+  --color-blue-900: #1E3A8A;          /* Deep royal blue */
+
+  --color-amber-50: #FFFBEB;          /* Warning light amber */
+  --color-amber-100: #FEF3C7;         
+  --color-amber-500: #F59E0B;         /* Warning amber */
+  --color-amber-600: #D97706;         
+  --color-amber-700: #B45309;         
+
+  --color-emerald-50: #ECFDF5;        /* Safe light emerald */
+  --color-emerald-100: #D1FAE5;       
+  --color-emerald-500: #10B981;       /* Safe emerald green */
+  --color-emerald-600: #059669;       
+  --color-emerald-700: #047857;       
+
+  --color-rose-50: #FFF1F2;           /* Danger light rose */
+  --color-rose-100: #FFE4E6;          
+  --color-rose-500: #F43F5E;          /* Danger rose red */
+  --color-rose-600: #E11D48;          
+  --color-rose-700: #BE123C;          
+}
+
+@layer base {
+  body {
+    background-color: #F8FAFC;
+    color: #1E293B;
+    font-family: var(--font-sans);
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid #E2E8F0;
+    box-shadow: 0 4px 30px rgba(37, 99, 235, 0.03);
+  }
+
+  .glass-panel-dark {
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(226, 232, 240, 0.1);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.15);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(37, 99, 235, 0.1);
+    border-radius: 9999px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(37, 99, 235, 0.25);
+  }
+}

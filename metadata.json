@@ -1,0 +1,8 @@
+{
+  "name": "Remix: ระบบจัดการสุขภาพ ตำบลไผ่ต่ำ",
+  "description": "ระบบจัดการสุขภาพ ตำบลไผ่ต่ำ พร้อมแผนที่ข้อมูลกลุ่มผู้ป่วยติดเตียง ติดบ้าน และติดสังคม และรายงานสุขภาพแบบเรียลไทม์",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
