@@ -30,12 +30,15 @@ import {
   Clipboard,
   Shield,
   Mail,
-  UserCheck
+  UserCheck,
+  Menu,
+  Award
 } from 'lucide-react';
 import { googleSignIn, googleSignOut, initAuth, getAccessToken } from './lib/firebase';
 import { SheetsService, SEED_PATIENTS, SEED_ACTIVITIES } from './lib/sheetsService';
 import { exportAllToExcel, exportSingleTableToExcel } from './lib/excelExport';
 import { Patient, Activity, PatientCategory, ActivityType, ActivityStatus, DashboardStats } from './types';
+import { CoinExchangeWidget } from './components/CoinExchangeWidget';
 
 const HealthLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -201,6 +204,7 @@ export default function App() {
   const [mockStaffName, setMockStaffName] = useState<string>('');
   const [vhvLoginName, setVhvLoginName] = useState<string>('');
   const [staffGmailInput, setStaffGmailInput] = useState<string>('');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   // Authorized Staff Emails List for security whitelist
   const [authorizedEmails, setAuthorizedEmails] = useState<string[]>(() => {
@@ -263,7 +267,7 @@ export default function App() {
   const [editPatientCaregiver, setEditPatientCaregiver] = useState<string>('');
 
   // Mind Map active sub-section
-  const [selectedMindMapSection, setSelectedMindMapSection] = useState<'overview' | 'vhv' | 'patient' | 'caregiver'>('overview');
+  const [selectedMindMapSection, setSelectedMindMapSection] = useState<'overview' | 'vhv' | 'patient' | 'caregiver' | 'benefactor'>('overview');
 
   // Registered VHVs/Volunteers state
   const [vhvs, setVhvs] = useState<{ id: string; name: string; phone: string; address: string; moo?: string; type: 'อสม' | 'จิตอาสา' }[]>(() => {
@@ -293,6 +297,19 @@ export default function App() {
     ];
   });
 
+  // Registered Benefactors state (ผู้ทำคุณประโยชน์)
+  const [benefactors, setBenefactors] = useState<{ id: string; name: string; phone: string; address: string; moo?: string; contribution: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('stitchsync_benefactors');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [
+      { id: 'BEN-001', name: 'คุณสมชาย ใจดี (ผู้ใหญ่บ้านหมู่ 1)', phone: '081-111-2222', address: 'บ้านเลขที่ 1 หมู่ 1 ต.ไผ่ต่ำ', moo: 'หมู่ 1', contribution: 'บริจาคเตียงผู้ป่วยและอุปกรณ์ทางการแพทย์ 2 ชุด' },
+      { id: 'BEN-002', name: 'คุณวิภา สุขสวัสดิ์', phone: '082-222-3333', address: 'บ้านเลขที่ 45 หมู่ 3 ต.ไผ่ต่ำ', moo: 'หมู่ 3', contribution: 'สนับสนุนผ้าอ้อมผู้ใหญ่และถุงยังชีพประจำเดือน' },
+      { id: 'BEN-003', name: 'มูลนิธิไผ่ต่ำกุศลสงเคราะห์', phone: '083-333-4444', address: 'บ้านเลขที่ 88 หมู่ 5 ต.ไผ่ต่ำ', moo: 'หมู่ 5', contribution: 'สนับสนุนงบประมาณปรับปรุงสภาพบ้านผู้ป่วยภาวะพึ่งพิง' },
+    ];
+  });
+
   // Form fields for new registrations
   const [newVhvName, setNewVhvName] = useState<string>('');
   const [newVhvPhone, setNewVhvPhone] = useState<string>('');
@@ -305,6 +322,12 @@ export default function App() {
   const [newCgAddress, setNewCgAddress] = useState<string>('');
   const [newCgMoo, setNewCgMoo] = useState<string>('หมู่ 1');
   const [newCgRelationship, setNewCgRelationship] = useState<string>('ญาติ');
+
+  const [newBenName, setNewBenName] = useState<string>('');
+  const [newBenPhone, setNewBenPhone] = useState<string>('');
+  const [newBenAddress, setNewBenAddress] = useState<string>('');
+  const [newBenMoo, setNewBenMoo] = useState<string>('หมู่ 1');
+  const [newBenContribution, setNewBenContribution] = useState<string>('');
 
   // Edit VHV Modal States
   const [isEditVhvModalOpen, setIsEditVhvModalOpen] = useState<boolean>(false);
@@ -324,6 +347,15 @@ export default function App() {
   const [editCgMoo, setEditCgMoo] = useState<string>('หมู่ 1');
   const [editCgRelationship, setEditCgRelationship] = useState<string>('ญาติ');
 
+  // Edit Benefactor Modal States
+  const [isEditBenModalOpen, setIsEditBenModalOpen] = useState<boolean>(false);
+  const [editBenId, setEditBenId] = useState<string>('');
+  const [editBenName, setEditBenName] = useState<string>('');
+  const [editBenPhone, setEditBenPhone] = useState<string>('');
+  const [editBenAddress, setEditBenAddress] = useState<string>('');
+  const [editBenMoo, setEditBenMoo] = useState<string>('หมู่ 1');
+  const [editBenContribution, setEditBenContribution] = useState<string>('');
+
   // Save changes to localStorage
   useEffect(() => {
     localStorage.setItem('stitchsync_vhvs', JSON.stringify(vhvs));
@@ -333,12 +365,19 @@ export default function App() {
     localStorage.setItem('stitchsync_caregivers', JSON.stringify(caregivers));
   }, [caregivers]);
 
+  useEffect(() => {
+    localStorage.setItem('stitchsync_benefactors', JSON.stringify(benefactors));
+  }, [benefactors]);
+
   // Search & Moo filter query for each sub-section
   const [vhvSearchQuery, setVhvSearchQuery] = useState<string>('');
   const [vhvMooFilter, setVhvMooFilter] = useState<string>('ทั้งหมด');
 
   const [cgSearchQuery, setCgSearchQuery] = useState<string>('');
   const [cgMooFilter, setCgMooFilter] = useState<string>('ทั้งหมด');
+
+  const [benSearchQuery, setBenSearchQuery] = useState<string>('');
+  const [benMooFilter, setBenMooFilter] = useState<string>('ทั้งหมด');
 
   const [ptSearchQuery, setPtSearchQuery] = useState<string>('');
   const [ptMooFilter, setPtMooFilter] = useState<string>('ทั้งหมด');
@@ -361,6 +400,15 @@ export default function App() {
       return matchQuery && matchMoo;
     });
   }, [caregivers, cgSearchQuery, cgMooFilter]);
+
+  const filteredBenefactors = useMemo(() => {
+    return benefactors.filter(b => {
+      const q = benSearchQuery.toLowerCase();
+      const matchQuery = !q || b.name.toLowerCase().includes(q) || b.address.toLowerCase().includes(q) || b.contribution.toLowerCase().includes(q) || b.phone.includes(q);
+      const matchMoo = benMooFilter === 'ทั้งหมด' || b.moo === benMooFilter || b.address.includes(benMooFilter);
+      return matchQuery && matchMoo;
+    });
+  }, [benefactors, benSearchQuery, benMooFilter]);
 
   const filteredDbPatients = useMemo(() => {
     return patients.filter(p => {
@@ -838,8 +886,8 @@ export default function App() {
   // Export all system data to Excel (.xlsx) file
   const handleExportAllExcel = () => {
     try {
-      exportAllToExcel(patients, vhvs, caregivers, activities);
-      addLog('Local DB', `ดาวน์โหลดไฟล์ Excel (.xlsx) รวม 4 ฐานข้อมูลสำเร็จ (${patients.length} ผู้ป่วย, ${vhvs.length} อสม., ${caregivers.length} ผู้ดูแล, ${activities.length} บันทึกเยี่ยม)`, 'success');
+      exportAllToExcel(patients, vhvs, caregivers, activities, benefactors);
+      addLog('Local DB', `ดาวน์โหลดไฟล์ Excel (.xlsx) รวม 5 ฐานข้อมูลสำเร็จ (${patients.length} ผู้ป่วย, ${vhvs.length} อสม., ${caregivers.length} ผู้ดูแล, ${benefactors.length} ผู้ทำคุณประโยชน์, ${activities.length} บันทึกเยี่ยม)`, 'success');
     } catch (err: any) {
       console.error('Error exporting Excel:', err);
       addLog('Local DB', `เกิดข้อผิดพลาดการส่งออก Excel: ${err.message}`, 'error');
@@ -1735,6 +1783,10 @@ export default function App() {
 
   const handleRegisterCaregiver = (e: React.FormEvent) => {
     e.preventDefault();
+    if (userRole !== 'staff') {
+      alert('⚠️ สิทธิ์การใช้งานจำกัด: เฉพาะเจ้าหน้าที่สาธารณสุขเท่านั้นที่ได้รับอนุญาตให้ลงทะเบียนข้อมูลได้');
+      return;
+    }
     if (!newCgName.trim()) {
       alert('กรุณากรอกชื่อผู้ดูแล Caregiver');
       return;
@@ -1778,6 +1830,57 @@ export default function App() {
     setNewCgAddress('');
     setNewCgMoo('หมู่ 1');
     setNewCgRelationship('ญาติ');
+  };
+
+  const handleRegisterBenefactor = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (userRole !== 'staff') {
+      alert('⚠️ สิทธิ์การใช้งานจำกัด: เฉพาะเจ้าหน้าที่สาธารณสุขเท่านั้นที่ได้รับอนุญาตให้ลงทะเบียนผู้ทำคุณประโยชน์ได้');
+      return;
+    }
+    if (!newBenName.trim()) {
+      alert('กรุณากรอกชื่อผู้ทำคุณประโยชน์หรือองค์กร');
+      return;
+    }
+    const newId = `BEN-${String(benefactors.length + 1).padStart(3, '0')}`;
+    const formattedAddress = newBenAddress.trim()
+      ? (newBenAddress.includes(newBenMoo) ? newBenAddress.trim() : `${newBenAddress.trim()} ${newBenMoo}`)
+      : `ต.ไผ่ต่ำ อ.วิหารแดง จ.สระบุรี (${newBenMoo})`;
+
+    const newBen = {
+      id: newId,
+      name: newBenName.trim(),
+      phone: newBenPhone.trim() || '08x-xxx-xxxx',
+      address: formattedAddress,
+      moo: newBenMoo,
+      contribution: newBenContribution.trim() || 'ผู้สนับสนุนคุณประโยชน์ต่อชุมชนตำบลไผ่ต่ำ'
+    };
+    
+    const updatedBens = [newBen, ...benefactors];
+    setBenefactors(updatedBens);
+    localStorage.setItem('stitchsync_benefactors', JSON.stringify(updatedBens));
+    
+    // Add logs
+    const newActivity: Activity = {
+      timestamp: 'เมื่อสักครู่',
+      patientName: 'ระบบฐานข้อมูลกลาง',
+      caregiverName: newBenName.trim(),
+      type: 'นัดหมาย',
+      description: `ลงทะเบียนผู้ทำคุณประโยชน์รายใหม่: ${newBenName} [${newBenMoo}] - ${newBen.contribution}`,
+      status: 'Normal',
+    };
+    setActivities([newActivity, ...activities]);
+    localStorage.setItem('stitchsync_activities', JSON.stringify([newActivity, ...activities]));
+    
+    addLog('Local DB', `ลงทะเบียนผู้ทำคุณประโยชน์ใหม่: ${newBenName} (${newBenMoo}) สำเร็จ`, 'success');
+    alert(`ลงทะเบียนผู้ทำคุณประโยชน์ "${newBenName}" (${newBenMoo}) เรียบร้อยแล้ว!`);
+    
+    // Reset Form
+    setNewBenName('');
+    setNewBenPhone('');
+    setNewBenAddress('');
+    setNewBenMoo('หมู่ 1');
+    setNewBenContribution('');
   };
 
   const openEditPatient = (p: Patient) => {
@@ -1930,6 +2033,43 @@ export default function App() {
     setIsEditCgModalOpen(false);
   };
 
+  // Edit Benefactor Helpers
+  const openEditBen = (item: { id: string; name: string; phone: string; address: string; moo?: string; contribution: string }) => {
+    if (userRole !== 'staff') {
+      alert('⚠️ สิทธิ์การใช้งานจำกัด: เฉพาะเจ้าหน้าที่สาธารณสุขเท่านั้นที่ได้รับอนุญาตให้แก้ไขข้อมูลได้');
+      return;
+    }
+    setEditBenId(item.id);
+    setEditBenName(item.name);
+    setEditBenPhone(item.phone || '');
+    setEditBenAddress(item.address || '');
+    setEditBenMoo(item.moo || 'หมู่ 1');
+    setEditBenContribution(item.contribution || '');
+    setIsEditBenModalOpen(true);
+  };
+
+  const submitEditBen = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (userRole !== 'staff') {
+      alert('⚠️ สิทธิ์การใช้งานจำกัด: เฉพาะเจ้าหน้าที่สาธารณสุขเท่านั้นที่ได้รับอนุญาตให้แก้ไขข้อมูลได้');
+      return;
+    }
+    if (!editBenName.trim()) return;
+    const updated = benefactors.map(b => b.id === editBenId ? {
+      ...b,
+      name: editBenName.trim(),
+      phone: editBenPhone.trim(),
+      address: editBenAddress.trim(),
+      moo: editBenMoo,
+      contribution: editBenContribution.trim(),
+    } : b);
+    setBenefactors(updated);
+    localStorage.setItem('stitchsync_benefactors', JSON.stringify(updated));
+    addLog('Local DB', `แก้ไขข้อมูลผู้ทำคุณประโยชน์ ${editBenName} สำเร็จ`, 'success');
+    alert(`แก้ไขข้อมูลผู้ทำคุณประโยชน์ "${editBenName}" เรียบร้อยแล้ว`);
+    setIsEditBenModalOpen(false);
+  };
+
   // Helper Stats Calculation
   const totalPopulation = patients.length || 2450;
   const bedboundCount = patients.filter(p => p.category === 'ติดเตียง').length || 12;
@@ -2073,7 +2213,7 @@ export default function App() {
                     <span>ส่วนลงชื่อเข้าใช้งานสำหรับ อสม.</span>
                   </p>
                   <p className="text-[11px] text-emerald-700 leading-relaxed">
-                    ไม่ต้องใส่รหัสผ่าน เพียงระบุชื่อผู้เข้าใช้งาน หรือเลือกรายชื่อ อสม. เพื่อเริ่มบันทึกและจัดการข้อมูลการเยี่ยมบ้านได้ทันที
+                    ไม่ต้องใส่รหัสผ่าน เพียงระบุชื่อผู้เข้าใช้งานเพื่อเริ่มบันทึกและจัดการข้อมูลการเยี่ยมบ้านได้ทันที
                   </p>
                 </div>
 
@@ -2083,32 +2223,11 @@ export default function App() {
                     <input
                       type="text"
                       required
-                      placeholder="ระบุชื่อของคุณ (เช่น อสม. สมเกียรติ สุขสบาย)"
+                      placeholder="กรอกชื่อ-นามสกุลของท่าน..."
                       value={vhvLoginName}
                       onChange={(e) => setVhvLoginName(e.target.value)}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-emerald-500 focus:bg-white focus:outline-none"
                     />
-                  </div>
-
-                  {/* Quick Select Buttons from VHV list */}
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">หรือคลิกรายชื่อ อสม. เพื่อเข้าใช้งานด่วน (1-Click):</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {vhvs.slice(0, 5).map((v) => (
-                        <button
-                          key={v.id}
-                          type="button"
-                          onClick={() => {
-                            setVhvLoginName(v.name);
-                            handleVhvLogin(undefined, v.name);
-                          }}
-                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 transition-all cursor-pointer flex items-center gap-1"
-                        >
-                          <span>{v.name}</span>
-                          <span className="text-[9px] text-slate-400">({v.moo || 'หมู่ 1'})</span>
-                        </button>
-                      ))}
-                    </div>
                   </div>
 
                   <button
@@ -2137,8 +2256,251 @@ export default function App() {
   return (
     <div className="flex h-screen w-full overflow-hidden bg-slate-50 text-slate-900 font-sans select-none relative">
       
+      {/* Mobile Navigation Drawer for Android & iOS Phones */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 z-50 md:hidden flex">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-slate-900"
+            />
+            {/* Sliding Drawer */}
+            <motion.aside
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="relative w-80 max-w-[85vw] bg-white h-full shadow-2xl flex flex-col z-10 safe-pb overflow-y-auto custom-scrollbar touch-scroll"
+            >
+              {/* Drawer Header */}
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center p-1 border border-emerald-100 shadow-sm">
+                    <HealthLogo className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h2 className="font-sans font-black text-base text-slate-800 leading-tight">ระบบสุขภาพไผ่ต่ำ</h2>
+                    <p className="text-[11px] text-slate-500">ตำบลไผ่ต่ำ จ.สระบุรี</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  aria-label="ปิดเมนู"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Navigation Links inside Drawer */}
+              <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto custom-scrollbar">
+                <p className="px-3 text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">
+                  มุมมองหลัก
+                </p>
+
+                <button 
+                  onClick={() => {
+                    setCurrentTab('dashboard');
+                    setSelectedMindMapSection('overview');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-xs transition-colors cursor-pointer text-left ${
+                    currentTab === 'dashboard' && selectedMindMapSection === 'overview'
+                      ? 'bg-blue-50 text-blue-700 font-bold' 
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                  }`}
+                >
+                  <MapIcon className="w-4 h-4 text-blue-600" />
+                  <span>แผงควบคุมหลัก (แผนที่)</span>
+                </button>
+
+                <div className="pt-3">
+                  <p className="px-3 text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">
+                    ส่วนการลงข้อมูลสุขภาวะ
+                  </p>
+
+                  <button 
+                    onClick={() => {
+                      setCurrentTab('dashboard');
+                      setSelectedMindMapSection('vhv');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-xs transition-colors cursor-pointer text-left ${
+                      currentTab === 'dashboard' && selectedMindMapSection === 'vhv'
+                        ? 'bg-blue-50 text-blue-700 font-bold' 
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                    }`}
+                  >
+                    <Users className="w-4 h-4 text-blue-500" />
+                    <span>1. ลงข้อมูล อสม. / จิตอาสา</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setCurrentTab('dashboard');
+                      setSelectedMindMapSection('patient');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-xs transition-colors cursor-pointer text-left ${
+                      currentTab === 'dashboard' && selectedMindMapSection === 'patient'
+                        ? 'bg-blue-50 text-blue-700 font-bold' 
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                    }`}
+                  >
+                    <Heart className="w-4 h-4 text-rose-500" />
+                    <span>2. ลงข้อมูล ผู้ป่วยภาวะพึ่งพิง</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setCurrentTab('dashboard');
+                      setSelectedMindMapSection('caregiver');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-xs transition-colors cursor-pointer text-left ${
+                      currentTab === 'dashboard' && selectedMindMapSection === 'caregiver'
+                        ? 'bg-blue-50 text-blue-700 font-bold' 
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                    }`}
+                  >
+                    <UserIcon className="w-4 h-4 text-emerald-500" />
+                    <span>3. ลงข้อมูล ผู้ดูแล (Caregiver)</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setCurrentTab('dashboard');
+                      setSelectedMindMapSection('benefactor');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-xs transition-colors cursor-pointer text-left ${
+                      currentTab === 'dashboard' && selectedMindMapSection === 'benefactor'
+                        ? 'bg-blue-50 text-blue-700 font-bold' 
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                    }`}
+                  >
+                    <Award className="w-4 h-4 text-amber-500" />
+                    <span>4. ลงข้อมูล ผู้ทำคุณประโยชน์</span>
+                  </button>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 mt-2">
+                  <p className="px-3 text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">
+                    รายงานและระบบหลังบ้าน
+                  </p>
+
+                  <button 
+                    onClick={() => {
+                      setCurrentTab('analytics');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-xs transition-colors cursor-pointer text-left ${
+                      currentTab === 'analytics' 
+                        ? 'bg-blue-50 text-blue-700 font-bold' 
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                    }`}
+                  >
+                    <TrendingUp className="w-4 h-4 text-slate-500" />
+                    <span>วิเคราะห์ประชากร (Analytics)</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setCurrentTab('logs');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-xs transition-colors cursor-pointer text-left ${
+                      currentTab === 'logs' 
+                        ? 'bg-blue-50 text-blue-700 font-bold' 
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                    }`}
+                  >
+                    <ActivityIcon className="w-4 h-4 text-slate-500" />
+                    <span>ประวัติระบบส่งข้อมูล (Logs)</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setCurrentTab('team');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-xs transition-colors cursor-pointer text-left ${
+                      currentTab === 'team' 
+                        ? 'bg-blue-50 text-blue-700 font-bold' 
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                    }`}
+                  >
+                    <Settings className="w-4 h-4 text-slate-500" />
+                    <span>ตั้งค่าฐานข้อมูล (Settings)</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setCurrentTab('import');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-xs transition-colors cursor-pointer text-left ${
+                      currentTab === 'import' 
+                        ? 'bg-blue-50 text-blue-700 font-bold' 
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                    }`}
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-slate-500" />
+                    <span>เชื่อมต่อ Google Sheets</span>
+                  </button>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 mt-2">
+                  <button 
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-xs text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer text-left"
+                  >
+                    <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
+                    <span>ออกจากระบบ (Log Out)</span>
+                  </button>
+                </div>
+              </nav>
+
+              <div className="p-4 border-t border-slate-100 shrink-0">
+                {(userRole !== 'staff' && userRole !== 'caregiver') ? (
+                  <button 
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      alert('⚠️ สิทธิ์การใช้งานจำกัด: เฉพาะเจ้าหน้าที่สาธารณสุข, อสม. และผู้ดูแล Caregiver เท่านั้น');
+                    }}
+                    className="w-full bg-slate-100 text-slate-500 py-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 border border-slate-200 cursor-pointer"
+                  >
+                    <span>รายงานเข้าเยี่ยมบ้าน (ล็อกสิทธิ์)</span>
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setModalType('visit');
+                      setIsModalOpen(true);
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 shadow-sm transition-all cursor-pointer active:scale-98"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>รายงานเข้าเยี่ยมบ้าน</span>
+                  </button>
+                )}
+              </div>
+            </motion.aside>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Sidebar Navigation */}
-      <aside className="h-screen w-64 shrink-0 bg-white border-r border-slate-200 flex flex-col z-40">
+      <aside className="hidden md:flex h-screen w-64 shrink-0 bg-white border-r border-slate-200 flex-col z-40">
         
         {/* Title Header with Health Emblem Logo */}
         <div className="p-6 border-b border-slate-100 shrink-0">
@@ -2248,6 +2610,24 @@ export default function App() {
               <span className="flex items-center gap-2">
                 <UserIcon className="w-3.5 h-3.5 text-emerald-500" />
                 <span>3. ลงข้อมูล ผู้ดูแล (Caregiver)</span>
+              </span>
+            </button>
+
+            <button 
+              onClick={() => {
+                setCurrentTab('dashboard');
+                setSelectedMindMapSection('benefactor');
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium text-xs transition-colors cursor-pointer text-left ${
+                currentTab === 'dashboard' && selectedMindMapSection === 'benefactor'
+                  ? 'bg-blue-50 text-blue-700 font-bold' 
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-slate-300 shrink-0"></span>
+              <span className="flex items-center gap-2">
+                <Award className="w-3.5 h-3.5 text-amber-500" />
+                <span>4. ลงข้อมูล ผู้ทำคุณประโยชน์</span>
               </span>
             </button>
           </div>
@@ -2385,59 +2765,69 @@ export default function App() {
 
 
       {/* Main Content Pane */}
-      <main className="flex-1 relative overflow-hidden flex flex-col h-full">
+      <main className="flex-1 relative overflow-hidden flex flex-col h-full w-full">
         
         {/* Header bar matching Professional Polish */}
-        <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between shrink-0 z-30">
-          <div className="flex items-center gap-4">
+        <header className="h-16 bg-white border-b border-slate-200 px-3 sm:px-8 flex items-center justify-between shrink-0 z-30">
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* Mobile Hamburger Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl md:hidden transition-colors cursor-pointer shrink-0"
+              aria-label="เปิดเมนูหลัก"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
             <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
+              <span className="relative flex h-2 w-2 shrink-0">
                 <span className={`absolute inline-flex h-full w-full rounded-full ${syncing ? 'bg-amber-400 opacity-75' : 'bg-emerald-400 opacity-75'}`}></span>
                 <span className={`relative inline-flex rounded-full h-2 w-2 ${syncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></span>
               </span>
-              <span className="text-sm font-semibold text-slate-700">
-                {userRole === 'staff' ? 'สิทธิ์เจ้าหน้าที่ / อสม. (แก้ไขได้)' :
-                 userRole === 'caregiver' ? 'สิทธิ์ผู้ดูแล Caregiver (บันทึกรายงานเยี่ยมได้)' :
-                 userRole === 'dependent' ? 'สิทธิ์ผู้ป่วย/ญาติ (ดูรายงานและสถิติ)' :
-                 'โหมดบุคคลทั่วไป (ดูข้อมูลเท่านั้น)'}
+              <span className="text-xs sm:text-sm font-semibold text-slate-700 truncate max-w-[150px] sm:max-w-none">
+                {userRole === 'staff' ? 'สิทธิ์เจ้าหน้าที่ / อสม.' :
+                 userRole === 'caregiver' ? 'สิทธิ์ผู้ดูแล Caregiver' :
+                 userRole === 'dependent' ? 'สิทธิ์ผู้ป่วย/ญาติ' :
+                 'โหมดบุคคลทั่วไป'}
               </span>
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             {/* Inline Search Bar */}
-            <div className="relative flex items-center bg-slate-50 border border-slate-200 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 px-3 h-9 w-56 rounded-lg transition-all">
-              <Search className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
+            <div className="relative flex items-center bg-slate-50 border border-slate-200 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 px-2.5 h-9 w-28 sm:w-56 rounded-lg transition-all">
+              <Search className="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0" />
               <input 
                 type="text" 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="bg-transparent border-none focus:outline-none focus:ring-0 text-xs flex-1 placeholder:text-slate-400 text-slate-800 h-full w-full" 
-                placeholder="ค้นหาคนไข้, บ้านเลขที่, อาการ..." 
+                placeholder="ค้นหาคนไข้..." 
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="p-1 hover:bg-slate-200/50 rounded-full cursor-pointer">
+                <button onClick={() => setSearchQuery('')} className="p-0.5 hover:bg-slate-200/50 rounded-full cursor-pointer">
                   <X className="w-2.5 h-2.5 text-slate-500" />
                 </button>
               )}
             </div>
 
             {/* Excel Download & Google Drive Action Buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={handleExportAllExcel}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
+                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
                 title="ดาวน์โหลดไฟล์ Excel (.xlsx) รวม 4 ฐานข้อมูล"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">ดาวน์โหลด Excel</span>
+                <span className="hidden lg:inline">ดาวน์โหลด Excel</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleOpenGoogleDrive}
-                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
+                className="hidden sm:flex px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold items-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
                 title="เปิด Google Drive / Google Sheets"
               >
                 <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
@@ -2445,31 +2835,14 @@ export default function App() {
               </button>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="text-right flex flex-col items-end">
-                <div className="text-[16px] font-bold text-slate-800 flex items-center gap-1.5 leading-tight">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="text-right hidden sm:flex flex-col items-end">
+                <div className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5 leading-tight">
                   <span>{user?.displayName || 'Chaiwat Somchai'}</span>
-                  {userRole === 'staff' ? (
-                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[11px] font-extrabold rounded border border-blue-100 uppercase">
-                      เจ้าหน้าที่ อสม.
-                    </span>
-                  ) : userRole === 'caregiver' ? (
-                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[11px] font-extrabold rounded border border-emerald-100 uppercase">
-                      ผู้ดูแล Caregiver
-                    </span>
-                  ) : userRole === 'dependent' ? (
-                    <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[11px] font-extrabold rounded border border-amber-100 uppercase">
-                      ผู้ป่วยภาวะพึ่งพิง
-                    </span>
-                  ) : (
-                    <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[11px] font-extrabold rounded border border-slate-200 uppercase">
-                      บุคคลทั่วไป
-                    </span>
-                  )}
                 </div>
-                <div className="text-xs text-slate-500 mt-0.5">{user?.email || 'chaiwat.s@gmail.com'}</div>
+                <div className="text-[10px] text-slate-500">{user?.email || 'chaiwat.s@gmail.com'}</div>
               </div>
-              <div className="w-10 h-10 bg-slate-100 rounded-full border-2 border-blue-200 shadow-sm flex items-center justify-center text-slate-600 font-bold overflow-hidden shrink-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-slate-100 rounded-full border-2 border-blue-200 shadow-sm flex items-center justify-center text-slate-600 font-bold overflow-hidden shrink-0">
                 <img 
                   src={user?.photoURL && user.photoURL.trim() !== '' ? user.photoURL : 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=256&q=80'} 
                   className="w-full h-full object-cover" 
@@ -2543,7 +2916,7 @@ export default function App() {
                     </div>
 
                     {/* Content Body */}
-                    <div className="flex-1 overflow-hidden flex flex-col lg:flex-row p-6 gap-6">
+                    <div className="flex-1 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row p-3 sm:p-6 gap-4 sm:gap-6 touch-scroll">
                       {/* Left: Registration Form */}
                       <div className="w-full lg:w-[380px] bg-white rounded-2xl border border-slate-200 p-5 shadow-sm shrink-0 overflow-y-auto custom-scrollbar flex flex-col space-y-4">
                         <div>
@@ -2685,7 +3058,7 @@ export default function App() {
                         </div>
 
                         {/* Database Table */}
-                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar touch-scroll">
                           {filteredVhvs.length === 0 ? (
                             <div className="p-12 text-center text-slate-400 space-y-2">
                               <Users className="w-8 h-8 mx-auto text-slate-300" />
@@ -2789,7 +3162,7 @@ export default function App() {
                     </div>
 
                     {/* Content Body */}
-                    <div className="flex-1 overflow-hidden flex flex-col lg:flex-row p-6 gap-6">
+                    <div className="flex-1 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row p-3 sm:p-6 gap-4 sm:gap-6 touch-scroll">
                       {/* Left: Registration Form */}
                       <div className="w-full lg:w-[380px] bg-white rounded-2xl border border-slate-200 p-5 shadow-sm shrink-0 overflow-y-auto custom-scrollbar flex flex-col space-y-4">
                         <div>
@@ -2964,7 +3337,7 @@ export default function App() {
                         </div>
 
                         {/* Database Table */}
-                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar touch-scroll">
                           {filteredDbPatients.length === 0 ? (
                             <div className="p-12 text-center text-slate-400 space-y-2">
                               <Heart className="w-8 h-8 mx-auto text-slate-300" />
@@ -2976,7 +3349,7 @@ export default function App() {
                                 <tr className="bg-slate-50 text-slate-400 font-mono border-b border-slate-100">
                                   <th className="p-4 pl-6 font-bold">รหัส HN</th>
                                   <th className="p-4 font-bold">ชื่อ-นามสกุล</th>
-                                  <th className="p-4 font-bold">หมู่</th>
+                                  <th className="p-4 font-bold">หมู่บ้าน / หมู่ที่</th>
                                   <th className="p-4 font-bold">กลุ่มคัดกรอง</th>
                                   <th className="p-4 font-bold">อสม. รับผิดชอบ</th>
                                   <th className="p-4 font-bold">ที่อยู่อาศัยหลัก</th>
@@ -3073,7 +3446,7 @@ export default function App() {
                     </div>
 
                     {/* Content Layout */}
-                    <div className="flex-1 overflow-hidden flex flex-col lg:flex-row p-6 gap-6">
+                    <div className="flex-1 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row p-3 sm:p-6 gap-4 sm:gap-6 touch-scroll">
                       {/* Left: Registration Form */}
                       <div className="w-full lg:w-[380px] bg-white rounded-2xl border border-slate-200 p-5 shadow-sm shrink-0 overflow-y-auto custom-scrollbar flex flex-col space-y-4">
                         <div>
@@ -3209,7 +3582,7 @@ export default function App() {
                         </div>
 
                         {/* Database Table */}
-                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar touch-scroll">
                           {filteredCaregivers.length === 0 ? (
                             <div className="p-12 text-center text-slate-400 space-y-2">
                               <Users className="w-8 h-8 mx-auto text-slate-300" />
@@ -3221,7 +3594,7 @@ export default function App() {
                                 <tr className="bg-slate-50 text-slate-400 font-mono border-b border-slate-100">
                                   <th className="p-4 pl-6 font-bold">รหัสผู้ดูแล</th>
                                   <th className="p-4 font-bold">ชื่อ-นามสกุล</th>
-                                  <th className="p-4 font-bold">หมู่</th>
+                                  <th className="p-4 font-bold">หมู่บ้าน / หมู่ที่</th>
                                   <th className="p-4 font-bold">ความสัมพันธ์</th>
                                   <th className="p-4 font-bold">เบอร์โทรศัพท์</th>
                                   <th className="p-4 font-bold">ที่อยู่อาศัยหลัก</th>
@@ -3252,30 +3625,36 @@ export default function App() {
                                     <td className="p-4 font-mono text-slate-600">{item.phone}</td>
                                     <td className="p-4 text-slate-500 max-w-xs truncate">{item.address}</td>
                                     <td className="p-4 pr-6 text-right">
-                                      <div className="flex items-center justify-end gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => openEditCg(item)}
-                                          className="text-emerald-600 hover:text-emerald-800 font-bold text-xs hover:underline cursor-pointer"
-                                        >
-                                          แก้ไข
-                                        </button>
-                                        <span className="text-slate-300">|</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            if (window.confirm(`คุณต้องการลบข้อมูลผู้ดูแล "${item.name}" ใช่หรือไม่?`)) {
-                                              const updated = caregivers.filter(c => c.id !== item.id);
-                                              setCaregivers(updated);
-                                              localStorage.setItem('stitchsync_caregivers', JSON.stringify(updated));
-                                              addLog('Local DB', `ลบข้อมูลผู้ดูแล ${item.name} สำเร็จ`, 'success');
-                                            }
-                                          }}
-                                          className="text-rose-500 hover:text-rose-700 font-bold text-xs hover:underline cursor-pointer"
-                                        >
-                                          ลบข้อมูล
-                                        </button>
-                                      </div>
+                                      {userRole === 'staff' ? (
+                                        <div className="flex items-center justify-end gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => openEditCg(item)}
+                                            className="text-emerald-600 hover:text-emerald-800 font-bold text-xs hover:underline cursor-pointer"
+                                          >
+                                            แก้ไข
+                                          </button>
+                                          <span className="text-slate-300">|</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              if (window.confirm(`คุณต้องการลบข้อมูลผู้ดูแล "${item.name}" ใช่หรือไม่?`)) {
+                                                const updated = caregivers.filter(c => c.id !== item.id);
+                                                setCaregivers(updated);
+                                                localStorage.setItem('stitchsync_caregivers', JSON.stringify(updated));
+                                                addLog('Local DB', `ลบข้อมูลผู้ดูแล ${item.name} สำเร็จ`, 'success');
+                                              }
+                                            }}
+                                            className="text-rose-500 hover:text-rose-700 font-bold text-xs hover:underline cursor-pointer"
+                                          >
+                                            ลบข้อมูล
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-400 font-medium italic">
+                                          เฉพาะเจ้าหน้าที่
+                                        </span>
+                                      )}
                                     </td>
                                   </tr>
                                 ))}
@@ -3285,6 +3664,288 @@ export default function App() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* PART 4: ผู้ทำคุณประโยชน์ Registration and Directory */}
+                {selectedMindMapSection === 'benefactor' && (
+                  <div className="flex-1 overflow-hidden flex flex-col h-full bg-slate-50">
+                    {/* Header */}
+                    <div className="px-4 sm:px-6 py-4 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setSelectedMindMapSection('overview')}
+                          className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-600 transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                          <span>← กลับหน้าผังหลัก</span>
+                        </button>
+                        <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+                        <div className="flex items-center gap-2">
+                          <Award className="w-5 h-5 text-amber-500" />
+                          <h2 className="text-sm sm:text-base font-bold text-slate-800">
+                            4. ฐานข้อมูลผู้ทำคุณประโยชน์และผู้สนับสนุนชุมชน
+                          </h2>
+                        </div>
+                      </div>
+                      <span className="text-xs font-extrabold px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full font-mono">
+                        จำนวน: {benefactors.length} ราย/องค์กร
+                      </span>
+                    </div>
+
+                    {/* Content Body */}
+                    <div className="flex-1 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row p-3 sm:p-6 gap-4 sm:gap-6 touch-scroll">
+                      {/* Left: Registration Form */}
+                      <div className="w-full lg:w-[380px] bg-white rounded-2xl border border-slate-200 p-5 shadow-sm shrink-0 overflow-y-auto custom-scrollbar flex flex-col space-y-4">
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono">ลงทะเบียน ผู้ทำคุณประโยชน์</h3>
+                            {userRole === 'staff' ? (
+                              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-extrabold rounded border border-emerald-100">
+                                สิทธิ์เจ้าหน้าที่
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-extrabold rounded border border-amber-100">
+                                บุคคลทั่วไป (อ่านเท่านั้น)
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1">บันทึกประวัติผู้ทำคุณประโยชน์ บริจาคอุปกรณ์ หรือสนับสนุนงานสุขภาพชุมชน</p>
+                        </div>
+
+                        {userRole !== 'staff' && (
+                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs space-y-1">
+                            <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                              <span>เฉพาะเจ้าหน้าที่สาธารณสุข</span>
+                            </div>
+                            <p className="text-[11px] leading-relaxed text-amber-700">
+                              สิทธิ์บุคคลทั่วไปสามารถดูข้อมูลและดาวน์โหลดรายงานได้เท่านั้น หากต้องการลงทะเบียนหรือแก้ไขข้อมูล กรุณาลงชื่อเข้าใช้ด้วยบัญชีเจ้าหน้าที่
+                            </p>
+                          </div>
+                        )}
+
+                        <form onSubmit={handleRegisterBenefactor} className="space-y-4">
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600">ชื่อ-นามสกุล / ชื่อองค์กรผู้ทำคุณประโยชน์</label>
+                            <input
+                              type="text"
+                              required
+                              disabled={userRole !== 'staff'}
+                              value={newBenName}
+                              onChange={(e) => setNewBenName(e.target.value)}
+                              placeholder="เช่น คุณสมชาย ใจดี หรือ มูลนิธิสาธารณกุศล"
+                              className="w-full text-xs bg-slate-50 border border-slate-200 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 px-3 py-2 rounded-lg disabled:opacity-60 disabled:bg-slate-100"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600">เบอร์โทรศัพท์ติดต่อ</label>
+                            <input
+                              type="text"
+                              disabled={userRole !== 'staff'}
+                              value={newBenPhone}
+                              onChange={(e) => setNewBenPhone(e.target.value)}
+                              placeholder="เช่น 081-234-5678"
+                              className="w-full text-xs bg-slate-50 border border-slate-200 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 px-3 py-2 rounded-lg font-mono disabled:opacity-60 disabled:bg-slate-100"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600">ประจำหมู่บ้าน (หมู่ 1 - หมู่ 8)</label>
+                            <select
+                              disabled={userRole !== 'staff'}
+                              value={newBenMoo}
+                              onChange={(e) => setNewBenMoo(e.target.value)}
+                              className="w-full text-xs bg-slate-50 border border-slate-200 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 px-3 py-2 rounded-lg font-bold text-slate-700 cursor-pointer disabled:opacity-60 disabled:bg-slate-100"
+                            >
+                              {MOO_OPTIONS.map(m => (
+                                <option key={m} value={m}>{m} ต.ไผ่ต่ำ</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600">ที่อยู่อาศัย / ที่ตั้งองค์กร</label>
+                            <textarea
+                              disabled={userRole !== 'staff'}
+                              value={newBenAddress}
+                              onChange={(e) => setNewBenAddress(e.target.value)}
+                              placeholder="เช่น บ้านเลขที่ 1 หมู่ 1 ต.ไผ่ต่ำ อ.วิหารแดง"
+                              rows={2}
+                              className="w-full text-xs bg-slate-50 border border-slate-200 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 px-3 py-2 rounded-lg disabled:opacity-60 disabled:bg-slate-100"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600">รายละเอียดคุณประโยชน์ / สิ่งที่สนับสนุนชุมชน</label>
+                            <textarea
+                              disabled={userRole !== 'staff'}
+                              value={newBenContribution}
+                              onChange={(e) => setNewBenContribution(e.target.value)}
+                              placeholder="เช่น บริจาคเตียงผู้ป่วย 2 ชุด, สนับสนุนผ้าอ้อมผู้ใหญ่และถุงยังชีพ..."
+                              rows={3}
+                              className="w-full text-xs bg-slate-50 border border-slate-200 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 px-3 py-2 rounded-lg disabled:opacity-60 disabled:bg-slate-100"
+                            />
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={userRole !== 'staff'}
+                            className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 rounded-xl text-xs shadow-sm hover:shadow transition-all cursor-pointer flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>ยืนยันลงทะเบียนผู้ทำคุณประโยชน์</span>
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* Right: Registered Benefactors Database */}
+                      <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
+                        {/* Search & Action Bar */}
+                        <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-4 bg-slate-50/50">
+                          <div className="flex items-center gap-3">
+                            <div className="relative flex items-center bg-white border border-slate-200 focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 px-3 h-9 w-64 rounded-lg transition-all shrink-0">
+                              <Search className="w-3.5 h-3.5 text-slate-400 mr-2" />
+                              <input
+                                type="text"
+                                value={benSearchQuery}
+                                onChange={(e) => setBenSearchQuery(e.target.value)}
+                                className="bg-transparent border-none focus:outline-none focus:ring-0 text-xs flex-1 placeholder:text-slate-400 text-slate-800"
+                                placeholder="ค้นหาชื่อผู้ทำคุณประโยชน์ หรือสิ่งสนับสนุน..."
+                              />
+                              {benSearchQuery && (
+                                <button onClick={() => setBenSearchQuery('')} className="p-1 hover:bg-slate-100 rounded-full cursor-pointer">
+                                  <X className="w-2.5 h-2.5 text-slate-500" />
+                                </button>
+                              )}
+                            </div>
+                            <select
+                              value={benMooFilter}
+                              onChange={(e) => setBenMooFilter(e.target.value)}
+                              className="text-xs bg-white border border-slate-200 focus:border-amber-500 px-2.5 py-1.5 h-9 rounded-lg font-bold text-slate-700 cursor-pointer"
+                            >
+                              <option value="ทั้งหมด">หมู่บ้าน: ทั้งหมด (หมู่ 1-8)</option>
+                              {MOO_OPTIONS.map(m => (
+                                <option key={m} value={m}>{m}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                const benRows = filteredBenefactors.map((b, i) => ({
+                                  'ลำดับ': i + 1,
+                                  'รหัสผู้ทำคุณประโยชน์': b.id,
+                                  'ชื่อ-นามสกุล/องค์กร': b.name,
+                                  'ประจำหมู่บ้าน': b.moo || 'หมู่ 1',
+                                  'คุณประโยชน์/การสนับสนุน': b.contribution,
+                                  'เบอร์โทรศัพท์': b.phone,
+                                  'ที่อยู่': b.address
+                                }));
+                                exportSingleTableToExcel(benRows, 'รายชื่อผู้ทำคุณประโยชน์', `รายชื่อ_ผู้ทำคุณประโยชน์_${new Date().toISOString().split('T')[0]}`);
+                              }}
+                              className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
+                              title="ดาวน์โหลดรายชื่อผู้ทำคุณประโยชน์เป็นไฟล์ Excel"
+                            >
+                              <FileSpreadsheet className="w-3.5 h-3.5 text-amber-600" />
+                              <span>ดาวน์โหลด Excel</span>
+                            </button>
+                            <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">DATABASE_BEN_SYS</span>
+                          </div>
+                        </div>
+
+                        {/* Database Table */}
+                        <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar touch-scroll">
+                          {filteredBenefactors.length === 0 ? (
+                            <div className="p-12 text-center text-slate-400 space-y-2">
+                              <Award className="w-8 h-8 mx-auto text-slate-300" />
+                              <p className="text-xs font-bold">ไม่พบข้อมูลรายชื่อผู้ทำคุณประโยชน์ตรงตามที่ค้นหา</p>
+                            </div>
+                          ) : (
+                            <table className="w-full text-xs text-left border-collapse">
+                              <thead>
+                                <tr className="bg-slate-50 text-slate-400 font-mono border-b border-slate-100">
+                                  <th className="p-4 pl-6 font-bold">รหัส</th>
+                                  <th className="p-4 font-bold">ชื่อ-นามสกุล / องค์กร</th>
+                                  <th className="p-4 font-bold">หมู่บ้าน / หมู่ที่</th>
+                                  <th className="p-4 font-bold">การสนับสนุน / คุณประโยชน์ต่อชุมชน</th>
+                                  <th className="p-4 font-bold">เบอร์โทรศัพท์</th>
+                                  <th className="p-4 font-bold">ที่อยู่อาศัย / ที่ตั้ง</th>
+                                  <th className="p-4 pr-6 text-right font-bold">จัดการ</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {filteredBenefactors.map((item) => (
+                                  <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <td className="p-4 pl-6 font-mono font-bold text-slate-400">{item.id}</td>
+                                    <td 
+                                      className="p-4 font-bold text-amber-600 hover:text-amber-800 hover:underline cursor-pointer transition-colors"
+                                      onClick={() => setSelectedDetailItem({ type: 'ผู้ทำคุณประโยชน์' as any, name: item.name, data: item })}
+                                      title="คลิกเพื่อดูรายละเอียด"
+                                    >
+                                      {item.name}
+                                    </td>
+                                    <td className="p-4">
+                                      <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                        {item.moo || 'หมู่ 1'}
+                                      </span>
+                                    </td>
+                                    <td className="p-4 max-w-xs">
+                                      <span className="px-2 py-1 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-100 inline-block leading-normal">
+                                        {item.contribution || 'ผู้สนับสนุนชุมชน'}
+                                      </span>
+                                    </td>
+                                    <td className="p-4 font-mono text-slate-600">{item.phone}</td>
+                                    <td className="p-4 text-slate-500 max-w-xs truncate">{item.address}</td>
+                                    <td className="p-4 pr-6 text-right">
+                                      {userRole === 'staff' ? (
+                                        <div className="flex items-center justify-end gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => openEditBen(item)}
+                                            className="text-amber-600 hover:text-amber-800 font-bold text-xs hover:underline cursor-pointer"
+                                          >
+                                            แก้ไข
+                                          </button>
+                                          <span className="text-slate-300">|</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              if (window.confirm(`คุณต้องการลบข้อมูลผู้ทำคุณประโยชน์ "${item.name}" ใช่หรือไม่?`)) {
+                                                const updated = benefactors.filter(b => b.id !== item.id);
+                                                setBenefactors(updated);
+                                                localStorage.setItem('stitchsync_benefactors', JSON.stringify(updated));
+                                                addLog('Local DB', `ลบข้อมูลผู้ทำคุณประโยชน์ ${item.name} สำเร็จ`, 'success');
+                                              }
+                                            }}
+                                            className="text-rose-500 hover:text-rose-700 font-bold text-xs hover:underline cursor-pointer"
+                                          >
+                                            ลบข้อมูล
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-400 font-medium italic">
+                                          เฉพาะเจ้าหน้าที่
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Green Floating Room Widget for Coin Exchange System */}
+                    <CoinExchangeWidget
+                      userRole={userRole}
+                      userName={user?.displayName || 'อสม. สมบูรณ์ สุขใจ'}
+                      vhvs={vhvs}
+                      benefactors={benefactors}
+                      onAddLog={(source, msg, type) => addLog(source, msg, type)}
+                    />
                   </div>
                 )}
               </motion.div>
@@ -3929,6 +4590,214 @@ export default function App() {
                           );
                         })}
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* User Access Logs & IP Location Section (ระบบจัดการข้อมูล - บันทึกการเข้าถึงและพิกัด IP) */}
+                <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                    <div className="flex items-center space-x-2.5">
+                      <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+                        <Globe className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-850 flex items-center gap-2">
+                          <span>🌐 บันทึกประวัติการเข้าใช้งานและตำแหน่ง IP ของผู้ใช้ (User Access & IP Location Logs)</span>
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-mono font-extrabold rounded-full">
+                            LIVE TRACKING
+                          </span>
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          แสดงข้อมูลผู้เข้าใช้งาน หมายเลข IP Address ตำแหน่งภูมิศาสตร์ (GPS/อำเภอ) และอุปกรณ์ที่ใช้เข้าสู่ระบบจัดการข้อมูล
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs font-mono shrink-0">
+                      <span className="px-3 py-1.5 bg-slate-900 text-emerald-400 rounded-lg font-bold border border-slate-800 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                        <span>IP ปัจจุบัน: 182.52.231.42</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* IP Location Quick Info Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
+                      <div className="p-2.5 bg-blue-100 text-blue-700 rounded-lg shrink-0">
+                        <MapPin className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">ตำแหน่งหลักที่เข้าถึง</span>
+                        <span className="font-bold text-slate-800">ต.ไผ่ต่ำ อ.วิหารแดง จ.สระบุรี</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
+                      <div className="p-2.5 bg-emerald-100 text-emerald-700 rounded-lg shrink-0">
+                        <Shield className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">สถานะการตรวจสอบสิทธิ์ IP</span>
+                        <span className="font-bold text-emerald-700">อนุญาตและผ่านการรักษาความปลอดภัย</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
+                      <div className="p-2.5 bg-amber-100 text-amber-700 rounded-lg shrink-0">
+                        <Smartphone className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">เครือข่าย & ผู้ให้บริการ</span>
+                        <span className="font-bold text-slate-800">AIS Fibre / TrueOnline (Saraburi Node)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* User Access Logs Table */}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                    <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs font-bold text-slate-700">
+                      <span>ตารางประวัติผู้เข้าใช้งานระบบล่าสุด</span>
+                      <span className="text-[10px] font-mono text-slate-500">REALTIME_IP_SESSIONS</span>
+                    </div>
+
+                    <div className="overflow-x-auto touch-scroll">
+                      <table className="w-full text-xs text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-100/70 text-slate-500 font-mono text-[11px] border-b border-slate-200">
+                            <th className="p-3 pl-4 font-bold">เวลาเข้าใช้</th>
+                            <th className="p-3 font-bold">ชื่อผู้ใช้งาน / อีเมล</th>
+                            <th className="p-3 font-bold">สิทธิ์การใช้งาน</th>
+                            <th className="p-3 font-bold">หมายเลข IP Address</th>
+                            <th className="p-3 font-bold">ตำแหน่งที่ตั้ง (GPS / อำเภอ)</th>
+                            <th className="p-3 font-bold">อุปกรณ์ / บราวเซอร์</th>
+                            <th className="p-3 pr-4 font-bold text-right">สถานะ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                          {/* Entry 1: Current User */}
+                          <tr className="bg-emerald-50/40 hover:bg-emerald-50 transition-colors">
+                            <td className="p-3 pl-4 font-bold text-slate-700">
+                              {new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} (วันนี้)
+                            </td>
+                            <td className="p-3 font-sans font-bold text-slate-900">
+                              {user?.displayName || 'เจ้าหน้าที่ สสอ.วิหารแดง'}
+                              <span className="block text-[10px] font-mono text-slate-500 font-normal">{user?.email || 'hinnapat06@gmail.com'}</span>
+                            </td>
+                            <td className="p-3 font-sans">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                {userRole === 'staff' ? 'เจ้าหน้าที่ (Staff)' : 'บุคคลทั่วไป (Guest)'}
+                              </span>
+                            </td>
+                            <td className="p-3 font-bold text-blue-700">
+                              182.52.231.42
+                            </td>
+                            <td className="p-3 font-sans text-slate-700 font-medium">
+                              📍 ต.ไผ่ต่ำ อ.วิหารแดง จ.สระบุรี (14.3218, 100.9842)
+                            </td>
+                            <td className="p-3 text-slate-600">
+                              Google Chrome 126.0 (iOS Mobile)
+                            </td>
+                            <td className="p-3 pr-4 text-right">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-300 animate-ping" />
+                                <span>ONLINE</span>
+                              </span>
+                            </td>
+                          </tr>
+
+                          {/* Entry 2 */}
+                          <tr className="hover:bg-slate-50 transition-colors">
+                            <td className="p-3 pl-4 text-slate-600">
+                              21 ก.ค. 2569 22:45:10
+                            </td>
+                            <td className="p-3 font-sans font-bold text-slate-800">
+                              อสม. รัตนาภรณ์ รักษ์ดี
+                              <span className="block text-[10px] font-mono text-slate-400 font-normal">somchai.vhv@gmail.com</span>
+                            </td>
+                            <td className="p-3 font-sans">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                อสม. ประจำหมู่ 1
+                              </span>
+                            </td>
+                            <td className="p-3 font-bold text-slate-700">
+                              110.168.23.105
+                            </td>
+                            <td className="p-3 font-sans text-slate-600">
+                              📍 อ.วิหารแดง จ.สระบุรี (14.3185, 100.9820)
+                            </td>
+                            <td className="p-3 text-slate-500">
+                              Safari Mobile (iPhone 15 Pro)
+                            </td>
+                            <td className="p-3 pr-4 text-right">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                สำเร็จ
+                              </span>
+                            </td>
+                          </tr>
+
+                          {/* Entry 3 */}
+                          <tr className="hover:bg-slate-50 transition-colors">
+                            <td className="p-3 pl-4 text-slate-600">
+                              21 ก.ค. 2569 21:12:04
+                            </td>
+                            <td className="p-3 font-sans font-bold text-slate-800">
+                              อสม. สมพงษ์ ใจเย็น
+                              <span className="block text-[10px] font-mono text-slate-400 font-normal">sompong.vhv@gmail.com</span>
+                            </td>
+                            <td className="p-3 font-sans">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                อสม. ประจำหมู่ 3
+                              </span>
+                            </td>
+                            <td className="p-3 font-bold text-slate-700">
+                              49.228.192.14
+                            </td>
+                            <td className="p-3 font-sans text-slate-600">
+                              📍 ต.หนองหมู อ.วิหารแดง จ.สระบุรี (14.3105, 100.9521)
+                            </td>
+                            <td className="p-3 text-slate-500">
+                              Microsoft Edge (Windows 11)
+                            </td>
+                            <td className="p-3 pr-4 text-right">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                สำเร็จ
+                              </span>
+                            </td>
+                          </tr>
+
+                          {/* Entry 4 */}
+                          <tr className="hover:bg-slate-50 transition-colors">
+                            <td className="p-3 pl-4 text-slate-600">
+                              21 ก.ค. 2569 19:30:22
+                            </td>
+                            <td className="p-3 font-sans font-bold text-slate-800">
+                              คุณมะลิ (ผู้ดูแล Caregiver)
+                              <span className="block text-[10px] font-mono text-slate-400 font-normal">cg.mali@gmail.com</span>
+                            </td>
+                            <td className="p-3 font-sans">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                ผู้ดูแลคนไข้
+                              </span>
+                            </td>
+                            <td className="p-3 font-bold text-slate-700">
+                              171.96.185.88
+                            </td>
+                            <td className="p-3 font-sans text-slate-600">
+                              📍 อ.เมืองสระบุรี จ.สระบุรี (14.5289, 100.9108)
+                            </td>
+                            <td className="p-3 text-slate-500">
+                              Google Chrome (Android)
+                            </td>
+                            <td className="p-3 pr-4 text-right">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                สำเร็จ
+                              </span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </div>
@@ -4909,6 +5778,107 @@ export default function App() {
           </div>
         )}
 
+        {/* Edit Benefactor Modal */}
+        {isEditBenModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsEditBenModalOpen(false)}
+              className="absolute inset-0 bg-black"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Award className="w-4 h-4 text-amber-500" />
+                  <h3 className="text-sm font-bold text-slate-800">แก้ไขข้อมูลผู้ทำคุณประโยชน์</h3>
+                </div>
+                <button onClick={() => setIsEditBenModalOpen(false)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400 cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={submitEditBen} className="space-y-3.5 text-xs">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600">ชื่อ-นามสกุล / ชื่อองค์กร</label>
+                  <input
+                    type="text"
+                    required
+                    value={editBenName}
+                    onChange={(e) => setEditBenName(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600">เบอร์โทรศัพท์ติดต่อ</label>
+                  <input
+                    type="text"
+                    value={editBenPhone}
+                    onChange={(e) => setEditBenPhone(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600">ประจำหมู่บ้าน (หมู่ 1 - หมู่ 8)</label>
+                  <select
+                    value={editBenMoo}
+                    onChange={(e) => setEditBenMoo(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg font-bold text-slate-700"
+                  >
+                    {MOO_OPTIONS.map(m => (
+                      <option key={m} value={m}>{m} ต.ไผ่ต่ำ</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600">ที่อยู่อาศัย / ที่ตั้ง</label>
+                  <textarea
+                    value={editBenAddress}
+                    onChange={(e) => setEditBenAddress(e.target.value)}
+                    rows={2}
+                    className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-600">คุณประโยชน์ / สิ่งสนับสนุนชุมชน</label>
+                  <textarea
+                    value={editBenContribution}
+                    onChange={(e) => setEditBenContribution(e.target.value)}
+                    rows={3}
+                    className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg"
+                  />
+                </div>
+
+                <div className="pt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditBenModalOpen(false)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-lg cursor-pointer"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shadow-sm cursor-pointer"
+                  >
+                    บันทึกการแก้ไข
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
         {/* Detailed Info Overlay Card */}
         {selectedDetailItem && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 select-none">
@@ -4932,6 +5902,7 @@ export default function App() {
               <div className={`p-5 text-white ${
                 selectedDetailItem.type === 'อสม' ? 'bg-gradient-to-r from-blue-600 to-indigo-600' :
                 selectedDetailItem.type === 'ผู้ป่วย' ? 'bg-gradient-to-r from-rose-600 to-pink-600' :
+                selectedDetailItem.type === 'ผู้ทำคุณประโยชน์' ? 'bg-gradient-to-r from-amber-600 to-orange-600' :
                 'bg-gradient-to-r from-emerald-600 to-teal-600'
               }`}>
                 <div className="flex justify-between items-start">
@@ -4939,6 +5910,7 @@ export default function App() {
                     <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/25 text-white block w-fit mb-1.5">
                       {selectedDetailItem.type === 'อสม' ? 'ข้อมูล อสม. จิตอาสา' :
                        selectedDetailItem.type === 'ผู้ป่วย' ? 'ข้อมูลคนไข้ในระบบ' :
+                       selectedDetailItem.type === 'ผู้ทำคุณประโยชน์' ? 'ข้อมูลผู้ทำคุณประโยชน์' :
                        'ข้อมูลผู้ดูแล (Caregiver)'}
                     </span>
                     <h3 className="text-lg font-extrabold tracking-tight">{selectedDetailItem.name}</h3>
@@ -5109,6 +6081,42 @@ export default function App() {
                           'bg-emerald-50 text-emerald-700 border border-emerald-150'
                         }`}>{selectedDetailItem.data?.category || 'ไม่ระบุ'}</span>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedDetailItem.type === 'ผู้ทำคุณประโยชน์' && (
+                  <div className="space-y-3.5">
+                    <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <div>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">รหัสสมาชิก</p>
+                        <p className="text-xs font-mono font-bold text-slate-800 mt-0.5">{selectedDetailItem.data?.id || 'BEN-000'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">ประจำหมู่บ้าน</p>
+                        <p className="text-xs font-bold text-amber-700 mt-0.5">{selectedDetailItem.data?.moo || 'หมู่ 1'}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">สิ่งสนับสนุน / คุณประโยชน์ต่อชุมชน</p>
+                      <p className="text-xs font-semibold text-amber-900 bg-amber-50 p-3 rounded-xl border border-amber-200 leading-relaxed">
+                        {selectedDetailItem.data?.contribution || 'ผู้สนับสนุนชุมชนตำบลไผ่ต่ำ'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">เบอร์โทรศัพท์ติดต่อ</p>
+                      <p className="text-xs font-extrabold font-mono text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                        {selectedDetailItem.data?.phone || '08x-xxx-xxxx'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">ที่อยู่อาศัย / ที่ตั้งองค์กร</p>
+                      <p className="text-xs font-semibold text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-100 leading-relaxed">
+                        {selectedDetailItem.data?.address || 'ต.ไผ่ต่ำ อ.วิหารแดง จ.สระบุรี'}
+                      </p>
                     </div>
                   </div>
                 )}

@@ -9,7 +9,8 @@ export function exportAllToExcel(
   patients: Patient[],
   vhvs: any[],
   caregivers: any[],
-  activities: Activity[]
+  activities: Activity[],
+  benefactors: any[] = []
 ) {
   const wb = XLSX.utils.book_new();
 
@@ -57,7 +58,22 @@ export function exportAllToExcel(
   const cgWs = XLSX.utils.json_to_sheet(cgData);
   XLSX.utils.book_append_sheet(wb, cgWs, 'ผู้ดูแลหลัก_Caregivers');
 
-  // 4. บันทึกการเยี่ยมบ้าน (Activities)
+  // 4. ผู้ทำคุณประโยชน์
+  if (benefactors && benefactors.length > 0) {
+    const benData = benefactors.map((b, idx) => ({
+      'ลำดับ': idx + 1,
+      'รหัสผู้ทำคุณประโยชน์': b.id || `BEN-${idx + 1}`,
+      'ชื่อ-นามสกุล/องค์กร': b.name || '-',
+      'ประจำหมู่บ้าน': b.moo || 'หมู่ 1',
+      'การสนับสนุน/คุณประโยชน์': b.contribution || '-',
+      'เบอร์โทรศัพท์': b.phone || '-',
+      'ที่อยู่': b.address || '-'
+    }));
+    const benWs = XLSX.utils.json_to_sheet(benData);
+    XLSX.utils.book_append_sheet(wb, benWs, 'ผู้ทำคุณประโยชน์');
+  }
+
+  // 5. บันทึกการเยี่ยมบ้าน (Activities)
   const actData = activities.map((a, idx) => ({
     'ลำดับ': idx + 1,
     'เวลา/วันที่': a.timestamp || '-',
